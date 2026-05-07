@@ -26,7 +26,11 @@ resource "local_sensitive_file" "private_key" {
 }
 
 resource "local_file" "ansible_inventory" {
-  content  = "[ec2]\n${aws_instance.ec2.public_ip} ansible_user=ubuntu ansible_ssh_private_key_file=../secret/ec2_key.pem\n"
+  content = templatefile("${path.module}/templates/inventory.ini.tftpl", {
+    public_ip            = aws_instance.ec2.public_ip
+    ansible_user         = "ubuntu"
+    ssh_private_key_file = "../secret/ec2_key.pem"
+  })
   filename = "${path.module}/../ansible/inventory.ini"
 }
 
