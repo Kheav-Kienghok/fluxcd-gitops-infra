@@ -126,6 +126,33 @@
       debug:
         msg: "{{ kind_version_out.stdout }}"
 
+    - name: Check existing Kind clusters
+      command: kind get clusters
+      register: kind_clusters
+      changed_when: false
+      failed_when: false
+
+    - name: Create Kind cluster
+      command: kind create cluster --name fluxcd-gitops
+      when: kind_clusters.stdout is not search('^fluxcd-gitops$', multiline=True)
+
+    - name: Ensure kubectl config directory exists for ubuntu
+      file:
+        path: /home/ubuntu/.kube
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+
+    - name: Copy kubeconfig for ubuntu
+      copy:
+        src: /root/.kube/config
+        dest: /home/ubuntu/.kube/config
+        remote_src: true
+        owner: ubuntu
+        group: ubuntu
+        mode: "0600"
+
     # ── Flux CLI ──────────────────────────────────────────────────────────────
     - name: Download and install Flux CLI
       shell: curl -s https://fluxcd.io/install.sh | bash

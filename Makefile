@@ -51,7 +51,7 @@ apply:
 ## ansible: run ansible playbook (key chmod + playbook)
 ansible:
 	@chmod 400 $(SECRET_KEY)
-	cd $(ANSIBLE_DIR) && ansible-playbook playbook.yml
+	cd $(ANSIBLE_DIR) && ansible-playbook -i inventory.ini playbook.yml
 
 ## destroy: tear down all AWS resources
 destroy:
