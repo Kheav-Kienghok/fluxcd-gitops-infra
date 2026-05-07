@@ -1,0 +1,16 @@
+# SSH private key — never commit
+secret/*.pem
+secret/*.key
+
+# Terraform state and local overrides
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/terraform.tfvars
+terraform/*.auto.tfvars
+terraform/override.tf
+terraform/override.tf.json
+
+# Ansible retry files
+ansible/*.retry

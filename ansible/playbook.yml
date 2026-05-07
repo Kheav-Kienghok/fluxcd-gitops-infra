@@ -1,0 +1,151 @@
+---
+- name: Setup FluxCD GitOps environment
+  hosts: ec2
+  become: true
+
+  vars:
+    kind_version: "v0.23.0"
+    kubectl_version: "v1.30.2"
+    ansible_user: ubuntu
+
+  tasks:
+    # ── Bootstrap: wait for instance to be ready ──────────────────────────────
+    - name: Wait for SSH to become available
+      wait_for_connection:
+        delay: 10
+        timeout: 300
+
+    - name: Gather facts
+      setup:
+
+    - name: Wait for cloud-init to complete
+      raw: cloud-init status --wait
+      changed_when: false
+
+    # ── System prerequisites ──────────────────────────────────────────────────
+    - name: Update apt cache
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install system prerequisites
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - software-properties-common
+          - unzip
+        state: present
+
+    # ── Docker ────────────────────────────────────────────────────────────────
+    - name: Create Docker keyring directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download Docker GPG key
+      get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: "0644"
+
+    - name: Add Docker apt repository
+      apt_repository:
+        repo: >-
+          deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc]
+          https://download.docker.com/linux/ubuntu
+          {{ ansible_distribution_release }} stable
+        state: present
+        filename: docker
+
+    - name: Install Docker packages
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+    - name: Add ubuntu user to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: true
+
+    - name: Enable and start Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Verify Docker installation
+      command: docker --version
+      register: docker_version
+      changed_when: false
+
+    - name: Show Docker version
+      debug:
+        msg: "{{ docker_version.stdout }}"
+
+    # ── kubectl ───────────────────────────────────────────────────────────────
+    - name: Download kubectl
+      get_url:
+        url: "https://dl.k8s.io/release/{{ kubectl_version }}/bin/linux/amd64/kubectl"
+        dest: /usr/local/bin/kubectl
+        mode: "0755"
+
+    - name: Verify kubectl installation
+      command: kubectl version --client
+      register: kubectl_version_out
+      changed_when: false
+
+    - name: Show kubectl version
+      debug:
+        msg: "{{ kubectl_version_out.stdout }}"
+
+    # ── Kind ──────────────────────────────────────────────────────────────────
+    - name: Download Kind binary
+      get_url:
+        url: "https://kind.sigs.k8s.io/dl/{{ kind_version }}/kind-linux-amd64"
+        dest: /usr/local/bin/kind
+        mode: "0755"
+
+    - name: Verify Kind installation
+      command: kind version
+      register: kind_version_out
+      changed_when: false
+
+    - name: Show Kind version
+      debug:
+        msg: "{{ kind_version_out.stdout }}"
+
+    # ── Flux CLI ──────────────────────────────────────────────────────────────
+    - name: Download and install Flux CLI
+      shell: curl -s https://fluxcd.io/install.sh | bash
+      args:
+        creates: /usr/local/bin/flux
+
+    - name: Verify Flux CLI installation
+      command: flux version --client
+      register: flux_version_out
+      changed_when: false
+
+    - name: Show Flux CLI version
+      debug:
+        msg: "{{ flux_version_out.stdout }}"
+
+    # ── Summary ───────────────────────────────────────────────────────────────
+    - name: Installation complete
+      debug:
+        msg:
+          - "Docker  : {{ docker_version.stdout }}"
+          - "kubectl : {{ kubectl_version_out.stdout }}"
+          - "Kind    : {{ kind_version_out.stdout }}"
+          - "Flux    : {{ flux_version_out.stdout }}"
